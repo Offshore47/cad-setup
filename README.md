@@ -64,8 +64,8 @@ All generated parts are saved as **STEP files** (ISO 10303-21), compatible with:
 
 ## 📝 Changelog
 
-### v1.0.0 (January 2026)
-- Initial release
+### v1.1.0 (January 2026)
+- Fixeds Bugs for certain errors when generating flanges or Blinds of certain Sizes
 - API 6A/6BX Weld Neck and Blind flanges
 - 24 flange configurations (6 pressure classes × 4 sizes)
 
