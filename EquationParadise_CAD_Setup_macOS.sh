@@ -140,14 +140,21 @@ print_status "Installing PythonOCC-Core (this may take several minutes)..."
 print_success "PythonOCC-Core installed"
 
 # ============================================================
-# Step 4: Copy Generator Scripts
+# Step 4: Download Generator Scripts from GitHub
 # ============================================================
-print_status "Copying generator scripts..."
+print_status "Downloading generator scripts from GitHub..."
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GITHUB_RAW="https://raw.githubusercontent.com/Offshore47/cad-setup/main"
 
-SCRIPTS_TO_COPY=(
+SCRIPTS_TO_DOWNLOAD=(
     "cad_generator_gui_v1.3.0.py"
+    "cad_auth.py"
+    "flange_data.py"
+    "heavy_hex_nut_data.py"
+    "asme_b165_stud_data.py"
+    "api_6b_stud_data.py"
+    "api_6bx_stud_data.py"
+    "gasket_data.py"
     "generate_all_flanges_test.py"
     "generate_api_flange_v5.py"
     "generate_api_flange.py"
@@ -160,23 +167,48 @@ SCRIPTS_TO_COPY=(
     "generate_stud.py"
     "generate_gasket.py"
     "generate_ring_joint.py"
-    "flange_data.py"
-    "heavy_hex_nut_data.py"
-    "asme_b165_stud_data.py"
-    "api_6b_stud_data.py"
-    "api_6bx_stud_data.py"
-    "gasket_data.py"
-    "cad_auth.py"
-    "cadgen.ico"
+    "generate_180_return.py"
+    "generate_pressure_vessel.py"
+    "generate_steel_shapes.py"
+    "generate_dimensional_lumber.py"
+    "generate_lvl.py"
+    "generate_glulam.py"
+    "generate_psl.py"
+    "generate_tji.py"
+    "generate_cfs_framing.py"
+    "generate_rebar.py"
+    "generate_sheet_steel.py"
+    "generate_slip_on_flange.py"
+    "generate_socket_weld_flange.py"
+    "generate_threaded_flange.py"
+    "generate_lap_joint_flange.py"
+    "generate_pipe.py"
+    "flow_calculator_enhanced.py"
     "cadgen.png"
 )
 
-for script in "${SCRIPTS_TO_COPY[@]}"; do
-    src_path="$SCRIPT_DIR/$script"
-    if [ -f "$src_path" ]; then
-        cp "$src_path" "$SCRIPTS_DIR/"
-        print_success "Copied $script"
+download_file() {
+    local filename="$1"
+    local url="$GITHUB_RAW/$filename"
+    local dest="$SCRIPTS_DIR/$filename"
+    
+    if command -v curl &> /dev/null; then
+        curl -fsSL "$url" -o "$dest" 2>/dev/null
+    elif command -v wget &> /dev/null; then
+        wget -q "$url" -O "$dest" 2>/dev/null
     fi
+    
+    if [ -f "$dest" ]; then
+        print_success "Downloaded $filename"
+        return 0
+    else
+        print_warning "Could not download $filename"
+        return 1
+    fi
+}
+
+for script in "${SCRIPTS_TO_DOWNLOAD[@]}"; do
+    download_file "$script"
 done
 
 # ============================================================
