@@ -3158,6 +3158,51 @@ class CADGeneratorApp:
         
         self.status_var.set(f"✓ Bypass mode: {nps}\" Sch {schedule} ready to generate")
     
+    def _on_flow_class_change(self, event=None):
+        """Handle flange class change - update available flange types and show warnings"""
+        new_class = self.flow_flange_class_var.get()
+        
+        # Update available flange types for this class
+        if hasattr(self, 'flange_types_by_class') and hasattr(self, 'flow_flange_type_combo'):
+            available_types = self.flange_types_by_class.get(new_class, ["Weld Neck"])
+            self.flow_flange_type_combo['values'] = available_types
+            
+            # If current selection not available, reset to Weld Neck
+            if self.flow_flange_type_var.get() not in available_types:
+                self.flow_flange_type_var.set("Weld Neck")
+        
+        # Update the class warning label
+        if hasattr(self, 'flow_class_warning_label') and hasattr(self, 'flange_ratings'):
+            operating_pressure = getattr(self, 'flow_operating_pressure', 150)
+            avg_temp_f = getattr(self, 'flow_avg_temp', 100)
+            required_class = getattr(self, 'flow_required_class', "150")
+            
+            rating = self.flange_ratings.get(new_class, 285)
+            
+            # Check if selected class is adequate for pressure
+            class_order = ["150", "300", "600", "900", "1500", "2500"]
+            selected_idx = class_order.index(new_class) if new_class in class_order else 0
+            required_idx = class_order.index(required_class) if required_class in class_order else 0
+            
+            if selected_idx < required_idx:
+                # User selected a LOWER class than required - show RED warning
+                self.flow_class_warning_label.config(
+                    text=f"⚠ WARNING: Class {new_class} ({rating} psi) < Required ({operating_pressure:.0f} psi)!",
+                    fg="#dc2626"  # Red
+                )
+            elif selected_idx > required_idx:
+                # User selected HIGHER class - that's fine, show green
+                self.flow_class_warning_label.config(
+                    text=f"✓ Class {new_class} ({rating} psi) exceeds requirement",
+                    fg="#10b981"  # Green
+                )
+            else:
+                # Exact match
+                self.flow_class_warning_label.config(
+                    text=f"→ Class {new_class} ({rating} psi rated @ {avg_temp_f:.0f}°F)",
+                    fg=self.text_secondary
+                )
+    
     def _update_fittings_estimate(self):
         """Calculate estimated pressure drop from fittings + pipe"""
         try:
@@ -3649,18 +3694,17 @@ class CADGeneratorApp:
             fg=self.text_primary
         ).grid(row=0, column=2, sticky="w", padx=(0, 5))
         
-        # Class is LOCKED/DISABLED - auto-set by schedule pressure rating
+        # Class is now user-selectable (shows recommended but allows override)
         self.flow_flange_class_var = tk.StringVar(value=recommended_class)
-        self.flow_class_label = tk.Label(
+        self.flow_class_combo = ttk.Combobox(
             flange_config_frame,
-            text=recommended_class,
-            font=("Segoe UI", 9, "bold"),
-            bg="#374151",  # Darker background to show locked
-            fg="#fbbf24",  # Yellow text
-            padx=10,
-            pady=2
+            textvariable=self.flow_flange_class_var,
+            values=["150", "300", "600", "900", "1500", "2500"],
+            state="readonly",
+            width=8
         )
-        self.flow_class_label.grid(row=0, column=3, sticky="w", padx=(0, 15))
+        self.flow_class_combo.grid(row=0, column=3, sticky="w", padx=(0, 15))
+        self.flow_class_combo.bind("<<ComboboxSelected>>", self._on_flow_class_change)
         
         tk.Label(
             flange_config_frame,
