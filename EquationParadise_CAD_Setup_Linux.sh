@@ -184,6 +184,7 @@ SCRIPTS_TO_DOWNLOAD=(
     "generate_lap_joint_flange.py"
     "generate_pipe.py"
     "flow_calculator_enhanced.py"
+    "CAD_GENERATOR_USER_GUIDE.md"
     "cadgen.png"
 )
 
