@@ -5242,7 +5242,8 @@ class CADGeneratorApp:
                     message = "Generated"
                 
                 if success:
-                    self.root.after(0, lambda: self._generation_complete(filename))
+                    output_file = output_path / filename
+                    self.root.after(0, lambda f=filename, p=output_file: self._generation_complete(f, p))
                 else:
                     self.root.after(0, lambda msg=message: self._generation_error(msg))
             except Exception as e:
@@ -5299,7 +5300,7 @@ class CADGeneratorApp:
                         full_path = output_path / filename
                         rtj_blind_gen.generate_rtj_blind_flange(size, pressure, series, str(output_path))
                     
-                    self.root.after(0, lambda: self._generation_complete(filename))
+                    self.root.after(0, lambda f=filename, p=full_path: self._generation_complete(f, p))
                 
                 # Handle new flange types (SW, SO, Threaded, LJ)
                 elif generator_name:
@@ -5314,6 +5315,7 @@ class CADGeneratorApp:
                         import generate_lap_joint_flange as gen_module
                     
                     filename = f"ASME-{standard_label}-{pressure}-{size.replace('/', '-')}-{type_code}-{facing_code}.step"
+                    output_file = output_path / filename
                     
                     # Call generator with facing parameter
                     if generator_name == "generate_socket_weld_flange":
@@ -5325,7 +5327,7 @@ class CADGeneratorApp:
                     elif generator_name == "generate_lap_joint_flange":
                         gen_module.generate_lap_joint_flange(size, pressure, facing_code, str(output_path))
                     
-                    self.root.after(0, lambda: self._generation_complete(filename))
+                    self.root.after(0, lambda f=filename, p=output_file: self._generation_complete(f, p))
                 
                 # Handle old RF WN/Blind generators
                 elif facing_code == "RF":
@@ -5358,7 +5360,7 @@ class CADGeneratorApp:
                         )
                     
                     if result:
-                        self.root.after(0, lambda: self._generation_complete(filename))
+                        self.root.after(0, lambda f=filename, p=full_path: self._generation_complete(f, p))
                     else:
                         self.root.after(0, lambda: self._generation_error("Generation failed"))
                         
@@ -5457,7 +5459,11 @@ class CADGeneratorApp:
             
             # Report completion
             if len(generated_files) == 1:
-                self.root.after(0, lambda: self._generation_complete(generated_files[0]))
+                # generated_files[0] is already the full path from generator
+                first_path = generated_files[0]
+                import os
+                display_name = os.path.basename(first_path)
+                self.root.after(0, lambda f=display_name, p=first_path: self._generation_complete(f, p))
             else:
                 # For multiple files, show basenames but store first full path
                 import os
@@ -5654,7 +5660,8 @@ class CADGeneratorApp:
                 rj_type = gasket_type.split()[-1]  # "R" or "RX"
                 filename = rj_gen.generate_ring_joint(size, pressure_class, rj_type, str(output_path))
         
-            self.root.after(0, lambda: self._generation_complete(filename))
+            output_file = output_path / filename if filename else None
+            self.root.after(0, lambda f=filename, p=output_file: self._generation_complete(f, p))
         except Exception as e:
             error_msg = f"Gasket generation error: {str(e)}"
             self.root.after(0, lambda: self._generation_error(error_msg))
@@ -5678,16 +5685,18 @@ class CADGeneratorApp:
                 import importlib
                 importlib.reload(elb_gen)
                 elbow_filename = f"Elbow-90LR-{nps}-Sch{schedule}.step"
-                filename = elb_gen.generate_elbow(nps_float, schedule, angle=90, elbow_type='LR', output_file=str(output_path / elbow_filename))
-                self.root.after(0, lambda: self._generation_complete(filename))
+                output_file = output_path / elbow_filename
+                filename = elb_gen.generate_elbow(nps_float, schedule, angle=90, elbow_type='LR', output_file=str(output_file))
+                self.root.after(0, lambda f=filename, p=output_file: self._generation_complete(f, p))
                 
             elif "45° Elbow" in fitting_type:
                 import generate_elbow as elb_gen
                 import importlib
                 importlib.reload(elb_gen)
                 elbow_filename = f"Elbow-45LR-{nps}-Sch{schedule}.step"
-                filename = elb_gen.generate_elbow(nps_float, schedule, angle=45, elbow_type='LR', output_file=str(output_path / elbow_filename))
-                self.root.after(0, lambda: self._generation_complete(filename))
+                output_file = output_path / elbow_filename
+                filename = elb_gen.generate_elbow(nps_float, schedule, angle=45, elbow_type='LR', output_file=str(output_file))
+                self.root.after(0, lambda f=filename, p=output_file: self._generation_complete(f, p))
                 
             elif "Tee" in fitting_type:
                 import generate_tee as tee_gen
@@ -5697,11 +5706,13 @@ class CADGeneratorApp:
                     # Need branch size for reducing tee
                     branch_size = nps_float - 0.5 if nps_float > 1 else 0.5
                     tee_filename = f"Tee-Reducing-{nps}x{branch_size}-Sch{schedule}.step"
-                    filename = tee_gen.generate_tee(nps_float, schedule, branch_nps=branch_size, branch_schedule=schedule, output_file=str(output_path / tee_filename))
+                    output_file = output_path / tee_filename
+                    filename = tee_gen.generate_tee(nps_float, schedule, branch_nps=branch_size, branch_schedule=schedule, output_file=str(output_file))
                 else:
                     tee_filename = f"Tee-Equal-{nps}-Sch{schedule}.step"
-                    filename = tee_gen.generate_tee(nps_float, schedule, branch_nps=None, output_file=str(output_path / tee_filename))
-                self.root.after(0, lambda: self._generation_complete(filename))
+                    output_file = output_path / tee_filename
+                    filename = tee_gen.generate_tee(nps_float, schedule, branch_nps=None, output_file=str(output_file))
+                self.root.after(0, lambda f=filename, p=output_file: self._generation_complete(f, p))
                 
             elif "Reducer" in fitting_type:
                 import generate_reducer as red_gen
@@ -5713,16 +5724,18 @@ class CADGeneratorApp:
                 is_eccentric = "Eccentric" in fitting_type
                 red_type = "Ecc" if is_eccentric else "Con"
                 red_filename = f"Reducer-{red_type}-{nps}x{small_size}-Sch{schedule}.step"
-                filename = red_gen.generate_reducer(large_size, schedule, small_size, schedule, reducer_type='eccentric' if is_eccentric else 'concentric', output_file=str(output_path / red_filename))
-                self.root.after(0, lambda: self._generation_complete(filename))
+                output_file = output_path / red_filename
+                filename = red_gen.generate_reducer(large_size, schedule, small_size, schedule, reducer_type='eccentric' if is_eccentric else 'concentric', output_file=str(output_file))
+                self.root.after(0, lambda f=filename, p=output_file: self._generation_complete(f, p))
                 
             elif "Cross" in fitting_type:
                 import generate_cross as cross_gen
                 import importlib
                 importlib.reload(cross_gen)
                 cross_filename = f"Cross-{nps}-Sch{schedule}.step"
-                filename = cross_gen.generate_cross(nps_float, schedule, output_file=str(output_path / cross_filename))
-                self.root.after(0, lambda: self._generation_complete(filename))
+                output_file = output_path / cross_filename
+                filename = cross_gen.generate_cross(nps_float, schedule, output_file=str(output_file))
+                self.root.after(0, lambda f=filename, p=output_file: self._generation_complete(f, p))
             
             elif "180° Return" in fitting_type:
                 import generate_180_return as ret_gen
@@ -5731,8 +5744,9 @@ class CADGeneratorApp:
                 # Determine LR or SR
                 return_type = "LR" if "LR" in fitting_type else "SR"
                 ret_filename = f"Return180-{return_type}-NPS{nps}-Sch{schedule}.step"
-                filename = ret_gen.generate_180_return(nps_float, schedule, return_type=return_type, output_file=str(output_path / ret_filename))
-                self.root.after(0, lambda: self._generation_complete(filename))
+                output_file = output_path / ret_filename
+                filename = ret_gen.generate_180_return(nps_float, schedule, return_type=return_type, output_file=str(output_file))
+                self.root.after(0, lambda f=filename, p=output_file: self._generation_complete(f, p))
                 
             else:
                 self.root.after(0, lambda: self._generation_error(f"Unknown fitting type: {fitting_type}"))
@@ -5770,7 +5784,8 @@ class CADGeneratorApp:
                 output_file=output_file
             )
             
-            self.root.after(0, lambda: self._generation_complete(result))
+            full_path = output_dir / filename
+            self.root.after(0, lambda f=result, p=full_path: self._generation_complete(f, p))
             
         except Exception as e:
             error_msg = f"Pressure vessel generation error: {str(e)}"
@@ -5813,8 +5828,9 @@ class CADGeneratorApp:
                 output_file=output_file
             )
             
+            full_path = output_dir / filename
             if result['success']:
-                self.root.after(0, lambda: self._generation_complete(filename))
+                self.root.after(0, lambda f=filename, p=full_path: self._generation_complete(f, p))
             else:
                 self.root.after(0, lambda: self._generation_error(result['message']))
                 
@@ -5855,8 +5871,9 @@ class CADGeneratorApp:
                     output_file=output_file
                 )
                 
+                full_path = output_path / filename
                 if result['success']:
-                    self.root.after(0, lambda: self._generation_complete(filename))
+                    self.root.after(0, lambda f=filename, p=full_path: self._generation_complete(f, p))
                 else:
                     self.root.after(0, lambda: self._generation_error(result['message']))
                     
@@ -5872,8 +5889,9 @@ class CADGeneratorApp:
                 
                 result = dim_gen.generate_dimensional_lumber(size, length_ft, output_file)
                 
+                full_path = output_path / filename
                 if result['success']:
-                    self.root.after(0, lambda: self._generation_complete(filename))
+                    self.root.after(0, lambda f=filename, p=full_path: self._generation_complete(f, p))
                 else:
                     self.root.after(0, lambda: self._generation_error(result['message']))
             
@@ -5896,8 +5914,9 @@ class CADGeneratorApp:
                 
                 result = dim_gen.generate_dimensional_lumber(size, length_ft, output_file)
                 
+                full_path = output_path / filename
                 if result['success']:
-                    self.root.after(0, lambda: self._generation_complete(filename))
+                    self.root.after(0, lambda f=filename, p=full_path: self._generation_complete(f, p))
                 else:
                     self.root.after(0, lambda: self._generation_error(result['message']))
                     
@@ -5914,8 +5933,9 @@ class CADGeneratorApp:
                 
                 result = glulam_gen.generate_glulam(size, length_ft, output_file)
                 
+                full_path = output_path / filename
                 if result['success']:
-                    self.root.after(0, lambda: self._generation_complete(filename))
+                    self.root.after(0, lambda f=filename, p=full_path: self._generation_complete(f, p))
                 else:
                     self.root.after(0, lambda: self._generation_error(result['message']))
                     
@@ -5932,8 +5952,9 @@ class CADGeneratorApp:
                 
                 result = lvl_gen.generate_lvl(size, length_ft, output_file)
                 
+                full_path = output_path / filename
                 if result['success']:
-                    self.root.after(0, lambda: self._generation_complete(filename))
+                    self.root.after(0, lambda f=filename, p=full_path: self._generation_complete(f, p))
                 else:
                     self.root.after(0, lambda: self._generation_error(result['message']))
                     
@@ -5950,8 +5971,9 @@ class CADGeneratorApp:
                 
                 result = psl_gen.generate_psl(size, length_ft, output_file)
                 
+                full_path = output_path / filename
                 if result['success']:
-                    self.root.after(0, lambda: self._generation_complete(filename))
+                    self.root.after(0, lambda f=filename, p=full_path: self._generation_complete(f, p))
                 else:
                     self.root.after(0, lambda: self._generation_error(result['message']))
             else:
@@ -6021,8 +6043,9 @@ class CADGeneratorApp:
                     output_file=output_file
                 )
             
+            full_path = output_path / filename
             if result['success']:
-                self.root.after(0, lambda: self._generation_complete(filename))
+                self.root.after(0, lambda f=filename, p=full_path: self._generation_complete(f, p))
             else:
                 self.root.after(0, lambda: self._generation_error(result['message']))
                 
@@ -6052,8 +6075,9 @@ class CADGeneratorApp:
             
             result = rebar_gen.generate_rebar(bar_size, length_ft, material, output_file)
             
+            full_path = output_path / filename
             if result['success']:
-                self.root.after(0, lambda: self._generation_complete(filename))
+                self.root.after(0, lambda f=filename, p=full_path: self._generation_complete(f, p))
             else:
                 self.root.after(0, lambda: self._generation_error(result['message']))
                 
@@ -6120,12 +6144,13 @@ class CADGeneratorApp:
             error_msg = f"Sheet steel generation error: {str(e)}"
             self.root.after(0, lambda: self._generation_error(error_msg))
     
-    def _generation_complete(self, filename):
+    def _generation_complete(self, filename, file_path=None):
         self.status_var.set(f"✅ Created: {filename}")
         self.gen_btn.config(state="normal", text="⚙️  Generate STEP File")
         
-        # Store the path and show the clickable link
-        self.last_generated_path = filename
+        # Store the FULL path (not just filename) for the "Open" link
+        # If file_path provided, use it; otherwise assume filename is a full path
+        self.last_generated_path = str(file_path) if file_path else filename
         self.file_location_frame.pack(pady=(0, 10))
     
     def _generation_complete_multi(self, display_name, file_path):
