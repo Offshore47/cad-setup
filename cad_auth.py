@@ -302,9 +302,13 @@ class LoginWindow:
         )
         self.error_label.pack(pady=(0, 10))
         
+        # Button frame for Login and Cancel
+        button_frame = tk.Frame(content_frame, bg=bg_card)
+        button_frame.pack(fill=tk.X, pady=(0, 15))
+        
         # Login button
         self.login_btn = tk.Button(
-            content_frame,
+            button_frame,
             text="Sign In",
             font=("Segoe UI", 10, "bold"),
             bg=accent,
@@ -316,7 +320,23 @@ class LoginWindow:
             cursor="hand2",
             command=self._attempt_login
         )
-        self.login_btn.pack(fill=tk.X, ipady=10, pady=(0, 15))
+        self.login_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=10, padx=(0, 5))
+        
+        # Cancel button
+        self.cancel_btn = tk.Button(
+            button_frame,
+            text="Cancel",
+            font=("Segoe UI", 10, "bold"),
+            bg="#3a3a45",
+            fg="white",
+            activebackground="#4a4a55",
+            activeforeground="white",
+            relief=tk.FLAT,
+            bd=0,
+            cursor="hand2",
+            command=self._cancel_login
+        )
+        self.cancel_btn.pack(side=tk.RIGHT, fill=tk.X, expand=True, ipady=10, padx=(5, 0))
         
         # Footer links
         footer_frame = tk.Frame(content_frame, bg=bg_card)
@@ -353,11 +373,18 @@ class LoginWindow:
         signup_link.pack(side=tk.LEFT, padx=5)
         signup_link.bind("<Button-1>", lambda e: self._open_url("https://equationparadise.com/register"))
         
-        # Bind Enter key to login
+        # Bind Enter key to login and Escape to cancel
         self.root.bind('<Return>', lambda e: self._attempt_login())
+        self.root.bind('<Escape>', lambda e: self._cancel_login())
         
         # Focus email field
         self.email_entry.focus()
+    
+    def _cancel_login(self):
+        """Cancel login and exit application"""
+        self.root.destroy()
+        import sys
+        sys.exit(0)
     
     def _attempt_login(self):
         """Attempt to log in user"""
@@ -430,15 +457,23 @@ def require_authentication(callback):
     """
     auth_manager = AuthManager()
     
-    # Try silent validation first
+    # Always validate with server on startup (don't trust cached subscription status)
     try:
-        if auth_manager.token and auth_manager.validate_token():
-            # Already authenticated and subscription active
+        if auth_manager.token:
+            is_valid = auth_manager.validate_token()
+            if is_valid:
+                # Token valid and subscription active
+                callback(auth_manager)
+                return
+            else:
+                # Token valid but subscription expired - clear token and show login
+                auth_manager.logout()
+    except ConnectionError:
+        # Offline - allow if we have a token and cached subscription was active
+        # (grace period for network issues)
+        if auth_manager.token and auth_manager.subscription_active:
             callback(auth_manager)
             return
-    except ConnectionError:
-        # Offline - need to show error
-        pass
     
     # Need to show login
     login_window = LoginWindow(callback)
