@@ -935,12 +935,27 @@ class CADGeneratorApp:
         text_widget.config(state="disabled")
     
     def _open_full_readme(self):
-        """Open the full README file"""
+        """Open the full README file in a readable format"""
+        import webbrowser
+        import platform
+        import subprocess
+        
         readme_path = os.path.join(os.path.dirname(__file__), "CAD_GENERATOR_USER_GUIDE.md")
-        if os.path.exists(readme_path):
-            os.startfile(readme_path)
-        else:
-            messagebox.showinfo("README Not Found", f"Full guide not found at:\n{readme_path}")
+        
+        # Try to open online version first (nicely formatted)
+        online_url = "https://github.com/Offshore47/cad-setup/blob/main/CAD_GENERATOR_USER_GUIDE.md"
+        
+        try:
+            webbrowser.open(online_url)
+        except Exception:
+            # Fallback to local file with Notepad (Windows) or default text editor
+            if os.path.exists(readme_path):
+                if platform.system() == "Windows":
+                    subprocess.Popen(["notepad.exe", readme_path])
+                else:
+                    os.startfile(readme_path)
+            else:
+                messagebox.showinfo("User Guide", f"View the user guide online at:\n{online_url}")
     
     def _create_ui(self):
         # Header
