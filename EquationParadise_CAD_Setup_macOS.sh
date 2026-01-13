@@ -149,6 +149,7 @@ GITHUB_RAW="https://raw.githubusercontent.com/Offshore47/cad-setup/main"
 SCRIPTS_TO_DOWNLOAD=(
     "cad_generator_gui_v1.3.0.py"
     "cad_auth.py"
+    "cad_updater.py"
     "flange_data.py"
     "heavy_hex_nut_data.py"
     "asme_b165_stud_data.py"
