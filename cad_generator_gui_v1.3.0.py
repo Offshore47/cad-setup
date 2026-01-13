@@ -37,22 +37,151 @@ CONFIG_FILE = Path.home() / ".equationparadise" / "cad_config.json"
 FLANGE_STANDARDS = {}  # standard -> {size -> [pressures]}
 ALL_FLANGE_SIZES = set()
 
-def check_for_updates():
-    """Check for software updates from API"""
+# GitHub raw URL for downloading updates
+GITHUB_RAW_URL = "https://raw.githubusercontent.com/Offshore47/cad-setup/main"
+
+# List of all scripts that should be kept up to date
+UPDATABLE_SCRIPTS = [
+    "cad_generator_gui_v1.3.0.py",
+    "cad_auth.py",
+    "flange_data.py",
+    "heavy_hex_nut_data.py",
+    "asme_b165_stud_data.py",
+    "api_6b_stud_data.py",
+    "api_6bx_stud_data.py",
+    "gasket_data.py",
+    "generate_all_flanges_test.py",
+    "generate_api_flange_v5.py",
+    "generate_api_flange.py",
+    "generate_beveled_pipe.py",
+    "generate_cross.py",
+    "generate_elbow.py",
+    "generate_reducer.py",
+    "generate_tee.py",
+    "generate_hex_nut.py",
+    "generate_stud.py",
+    "generate_gasket.py",
+    "generate_ring_joint.py",
+    "generate_180_return.py",
+    "generate_pressure_vessel.py",
+    "generate_steel_shapes.py",
+    "generate_dimensional_lumber.py",
+    "generate_lvl.py",
+    "generate_glulam.py",
+    "generate_psl.py",
+    "generate_tji.py",
+    "generate_cfs_framing.py",
+    "generate_rebar.py",
+    "generate_sheet_steel.py",
+    "generate_slip_on_flange.py",
+    "generate_socket_weld_flange.py",
+    "generate_threaded_flange.py",
+    "generate_lap_joint_flange.py",
+    "generate_pipe.py",
+    "flow_calculator_enhanced.py",
+    "CAD_GENERATOR_USER_GUIDE.md"
+]
+
+def silent_auto_update():
+    """
+    Silently check for updates and automatically download/install them.
+    Runs on startup before the GUI loads.
+    Returns True if app was updated and needs restart, False otherwise.
+    """
     global LATEST_VERSION, UPDATE_AVAILABLE
+    
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    
     try:
+        # Check for updates from API
         response = requests.get(UPDATE_CHECK_URL, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            LATEST_VERSION = data.get('version', VERSION)
-            if LATEST_VERSION != VERSION:
-                UPDATE_AVAILABLE = True
-                print(f"Update available: {VERSION} -> {LATEST_VERSION}")
-            else:
-                print(f"Running latest version: {VERSION}")
+        if response.status_code != 200:
+            print(f"Update check failed: HTTP {response.status_code}")
+            return False
+        
+        data = response.json()
+        LATEST_VERSION = data.get('version', VERSION)
+        download_url = data.get('download_url', GITHUB_RAW_URL)
+        scripts_list = data.get('scripts', UPDATABLE_SCRIPTS)
+        
+        # Compare versions (strip 'v' prefix for comparison)
+        local_ver = VERSION.lstrip('v').split('.')
+        remote_ver = LATEST_VERSION.lstrip('v').split('.')
+        
+        # Convert to integers for proper comparison
+        try:
+            local_nums = [int(x) for x in local_ver]
+            remote_nums = [int(x) for x in remote_ver]
+        except ValueError:
+            # If version parsing fails, skip update
+            return False
+        
+        # Check if remote is newer
+        needs_update = False
+        for i in range(max(len(local_nums), len(remote_nums))):
+            local_n = local_nums[i] if i < len(local_nums) else 0
+            remote_n = remote_nums[i] if i < len(remote_nums) else 0
+            if remote_n > local_n:
+                needs_update = True
+                break
+            elif remote_n < local_n:
+                break
+        
+        if not needs_update:
+            print(f"CAD Generator is up to date (v{VERSION})")
+            return False
+        
+        UPDATE_AVAILABLE = True
+        print(f"Updating CAD Generator: {VERSION} -> {LATEST_VERSION}")
+        
+        # Download and update each script
+        updated_count = 0
+        failed_count = 0
+        
+        for script_name in scripts_list:
+            try:
+                script_url = f"{download_url}/{script_name}"
+                script_path = os.path.join(scripts_dir, script_name)
+                
+                # Download the file
+                resp = requests.get(script_url, timeout=30)
+                if resp.status_code == 200:
+                    # Write to a temp file first, then rename (atomic operation)
+                    temp_path = script_path + ".tmp"
+                    with open(temp_path, 'wb') as f:
+                        f.write(resp.content)
+                    
+                    # Replace the original file
+                    if os.path.exists(script_path):
+                        os.remove(script_path)
+                    os.rename(temp_path, script_path)
+                    
+                    updated_count += 1
+                    print(f"  Updated: {script_name}")
+                else:
+                    print(f"  Skipped (not found): {script_name}")
+            except Exception as e:
+                failed_count += 1
+                print(f"  Failed: {script_name} - {e}")
+        
+        print(f"Update complete: {updated_count} files updated, {failed_count} failed")
+        
+        # If we updated the main GUI script, we need to restart
+        if "cad_generator_gui" in str(scripts_list) and updated_count > 0:
+            return True
+        
+        return False
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Update check failed (network): {e}")
+        return False
     except Exception as e:
         print(f"Update check failed: {e}")
-        # Silently fail - don't block app startup
+        return False
+
+def check_for_updates():
+    """Legacy function - now calls silent_auto_update"""
+    return silent_auto_update()
 
 def build_complete_flange_lookup():
     """Build lookup table for ALL flanges: API 6BX and ASME B16.5."""
@@ -6003,6 +6132,18 @@ def main(auth_manager):
 
 
 if __name__ == "__main__":
+    # Silent auto-update check - downloads updates automatically
+    needs_restart = silent_auto_update()
+    
+    if needs_restart:
+        # The main script was updated - restart the application
+        print("Restarting with updated version...")
+        import subprocess
+        python_exe = sys.executable
+        script_path = os.path.abspath(__file__)
+        subprocess.Popen([python_exe, script_path])
+        sys.exit(0)
+    
     # Build complete flange lookup tables
     build_complete_flange_lookup()
     # Use authentication wrapper
